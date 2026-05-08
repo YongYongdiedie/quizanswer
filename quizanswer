@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>학교 질문 답변 게시판</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f6fa;
+    }
+
+    h1, h2 {
+      color: #222;
+    }
+
+    .box {
+      background: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+      font-weight: bold;
+    }
+
+    input, select, textarea, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 6px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 15px;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .question-card {
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+      background: #fafafa;
+    }
+
+    .question-card img {
+      max-width: 100%;
+      margin-top: 10px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+
+    .answer {
+      background: #eef6ff;
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .warning {
+      background: #fff3cd;
+      padding: 12px;
+      border-radius: 8px;
+      color: #664d03;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>학교 질문 답변 게시판</h1>
+
+  <div class="warning">
+    이 페이지는 HTML만으로 만든 시제품입니다.  
+    입력한 내용은 현재 사용하는 브라우저에만 저장되며, 다른 사람이나 다른 기기에서는 볼 수 없습니다.
+  </div>
+
+  <!-- 학생 질문 등록 영역 -->
+  <div class="box">
+    <h2>학생 질문 올리기</h2>
+
+    <label>학년</label>
+    <select id="grade">
+      <option value="7학년">7학년</option>
+      <option value="8학년">8학년</option>
+      <option value="9학년">9학년</option>
+      <option value="10학년">10학년</option>
+    </select>
+
+    <label>과목</label>
+    <select id="subject">
+      <option value="수학">수학</option>
+      <option value="국어">국어</option>
+      <option value="과학">과학</option>
+      <option value="영어">영어</option>
+      <option value="사회">사회</option>
+    </select>
+
+    <label>질문 내용</label>
+    <textarea id="questionText" rows="4" placeholder="어떤 부분이 이해되지 않는지 적어 주세요."></textarea>
+
+    <label>문제 사진</label>
+    <input type="file" id="imageInput" accept="image/*" />
+
+    <button onclick="submitQuestion()">질문 제출하기</button>
+  </div>
+
+  <!-- 관리자 로그인 -->
+  <div class="box">
+    <h2>관리자 로그인</h2>
+    <input type="password" id="adminPassword" placeholder="관리자 비밀번호 입력" />
+    <button onclick="adminLogin()">로그인</button>
+  </div>
+
+  <!-- 관리자 영역 -->
+  <div id="adminPanel" class="box hidden">
+    <h2>관리자 답변 관리</h2>
+    <button onclick="logout()">로그아웃</button>
+    <button onclick="clearAll()">전체 질문 삭제</button>
+    <div id="questionList"></div>
+  </div>
+
+  <script>
+    const ADMIN_PASSWORD = "1234"; 
+    // 실제 서비스에서는 이렇게 비밀번호를 HTML 안에 넣으면 안 됩니다.
+
+    function getQuestions() {
+      return JSON.parse(localStorage.getItem("questions") || "[]");
+    }
+
+    function saveQuestions(questions) {
+      localStorage.setItem("questions", JSON.stringify(questions));
+    }
+
+    function submitQuestion() {
+      const grade = document.getElementById("grade").value;
+      const subject = document.getElementById("subject").value;
+      const questionText = document.getElementById("questionText").value.trim();
+      const imageInput = document.getElementById("imageInput");
+
+      if (!questionText && imageInput.files.length === 0) {
+        alert("질문 내용이나 사진을 입력해 주세요.");
+        return;
+      }
+
+      const file = imageInput.files[0];
+
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          saveQuestionData(grade, subject, questionText, e.target.result);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        saveQuestionData(grade, subject, questionText, "");
+      }
+    }
+
+    function saveQuestionData(grade, subject, questionText, imageData) {
+      const questions = getQuestions();
+
+      const newQuestion = {
+        id: Date.now(),
+        grade,
+        subject,
+        questionText,
+        imageData,
+        answer: "",
+        createdAt: new Date().toLocaleString()
+      };
+
+      questions.push(newQuestion);
+      saveQuestions(questions);
+
+      alert("질문이 저장되었습니다.");
+
+      document.getElementById("questionText").value = "";
+      document.getElementById("imageInput").value = "";
+
+      if (!document.getElementById("adminPanel").classList.contains("hidden")) {
+        renderQuestions();
+      }
+    }
+
+    function adminLogin() {
+      const password = document.getElementById("adminPassword").value;
+
+      if (password === ADMIN_PASSWORD) {
+        document.getElementById("adminPanel").classList.remove("hidden");
+        renderQuestions();
+        alert("관리자 로그인 성공");
+      } else {
+        alert("비밀번호가 틀렸습니다.");
+      }
+    }
+
+    function logout() {
+      document.getElementById("adminPanel").classList.add("hidden");
+      document.getElementById("adminPassword").value = "";
+    }
+
+    function renderQuestions() {
+      const questionList = document.getElementById("questionList");
+      const questions = getQuestions();
+
+      if (questions.length === 0) {
+        questionList.innerHTML = "<p>등록된 질문이 없습니다.</p>";
+        return;
+      }
+
+      questionList.innerHTML = "";
+
+      questions.forEach((q, index) => {
+        const card = document.createElement("div");
+        card.className = "question-card";
+
+        card.innerHTML = `
+          <p><strong>등록일:</strong> ${q.createdAt}</p>
+          <p><strong>학년:</strong> ${q.grade}</p>
+          <p><strong>과목:</strong> ${q.subject}</p>
+          <p><strong>질문:</strong><br>${q.questionText || "내용 없음"}</p>
+          ${q.imageData ? `<img src="${q.imageData}" alt="문제 사진">` : ""}
+          
+          <label>답변 작성</label>
+          <textarea id="answer-${q.id}" rows="4">${q.answer || ""}</textarea>
+          <button onclick="saveAnswer(${q.id})">답변 저장</button>
+          <button onclick="deleteQuestion(${q.id})">이 질문 삭제</button>
+
+          ${
+            q.answer 
+            ? `<div class="answer"><strong>저장된 답변:</strong><br>${q.answer}</div>` 
+            : ""
+          }
+        `;
+
+        questionList.appendChild(card);
+      });
+    }
+
+    function saveAnswer(id) {
+      const questions = getQuestions();
+      const answerText = document.getElementById(`answer-${id}`).value.trim();
+
+      const updatedQuestions = questions.map(q => {
+        if (q.id === id) {
+          q.answer = answerText;
+        }
+        return q;
+      });
+
+      saveQuestions(updatedQuestions);
+      alert("답변이 저장되었습니다.");
+      renderQuestions();
+    }
+
+    function deleteQuestion(id) {
+      if (!confirm("이 질문을 삭제할까요?")) return;
+
+      const questions = getQuestions().filter(q => q.id !== id);
+      saveQuestions(questions);
+      renderQuestions();
+    }
+
+    function clearAll() {
+      if (!confirm("전체 질문을 삭제할까요?")) return;
+
+      localStorage.removeItem("questions");
+      renderQuestions();
+    }
+  </script>
+
+</body>
+</html>
